@@ -3,12 +3,15 @@ from __future__ import division, print_function
 # coding=utf-8
 import sys
 import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import glob
 import re
 import numpy as np
 import pandas as pd
 import tensorflow as tf
+from tensorflow import keras
 import keras
+import cv2
 
 # Keras
 from keras.applications.imagenet_utils import preprocess_input, decode_predictions
@@ -30,31 +33,30 @@ MODEL_PATH = 'models/model_skripsi.h5'
 # Load your own trained model
 model = load_model(MODEL_PATH)
 model.make_predict_function()
-print('Model loaded. Start serving...')
 
-# You can also use pretrained model from Keras
-# Check https://keras.io/applications/
-#from keras.applications.resnet50 import ResNet50
-# model = ResNet50(weights='imagenet')
-# model.save('')
-
-print('Model loaded. Check http://127.0.0.1:5000/')
+print('\n Model loaded. Start serving on http://127.0.0.1:5000/ \n')
 
 def model_predict(img_path, model):
-    img = image.load_img(img_path, target_size=(448, 448))
+    img = image.load_img(img_path, color_mode="grayscale", target_size=(448, 448))
 
     # Preprocessing the image
     x = image.img_to_array(img)
+    print(x.shape)
     x = np.true_divide(x, 255)
-    x = np.expand_dims(x, axis=-1)
-
+    print(x.shape)
+    x = np.expand_dims(x, axis=0)
+    print(x.shape)
+    print(x.shape[1:])
+    preds = model.predict(x)
+    print('Hasil Prediksi', preds)
+    print('\n')
     # Be careful how your trained model deals with the input
     # otherwise, it won't make correct prediction!
-    # x = preprocess_input(x, mode='torch')
+    # x = preprocess_input(x, mode='tf')
+    # preds = model.predict(x)
+    # print('Hasil Prediksi', preds)
 
-    preds = model.predict(x)
     return preds
-
 
 @app.route('/', methods=['GET'])
 def index():
@@ -70,17 +72,22 @@ def upload():
 
         # Save the file to ./uploads
         basepath = os.path.dirname(__file__)
-        file_path = os.path.join(
-            basepath, 'uploads', secure_filename(f.filename))
+        file_path = os.path.join(basepath, 'uploads', secure_filename(f.filename))
         f.save(file_path)
 
         # Make prediction
         preds = model_predict(file_path, model)
+        # print(preds)
+        pred_class = preds.argmax(axis=1)
 
-        # Process your result for human
-        pred_class = preds.argmax(axis=1)            # Simple argmax
-        # pred_class = decode_predictions(preds, top=1)   # ImageNet Decode
-        result = str(pred_class[0][1][2][3])             # Convert to string
+        if pred_class == 0:
+            result = 'Kulit Domba'
+        elif pred_class == 1:
+            result = 'Kulit Imitasi'
+        elif pred_class == 2:
+            result = 'Kulit Kambing'
+        else:
+            result = 'Kulit Sapi'
         return result
     return None
 
